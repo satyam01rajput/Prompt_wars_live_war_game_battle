@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Prompt Wars — Admin Panel</title>
   <meta name="description" content="Host control panel for Prompt Wars event management." />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
   <style>
     .admin-grid {
       display: grid;
@@ -431,8 +431,19 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="utils.js"></script>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <p class="site-footer-copy">Prompt Wars Host Console</p>
+      <div class="site-footer-links">
+        <a href="index.html">Home</a>
+        <a href="leaderboard.html">Leaderboard View</a>
+        <a href="api-test.html">API Tester</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/utils.js"></script>
   <script>
     let adminPassword = '';
     let currentRound = 1, currentStatus = 'closed', currentPollMode = 'majority';
@@ -452,14 +463,20 @@
       document.getElementById('pw-error').style.display = 'none';
 
       // Validate by making a status request with password
-      const res = await callAPIGet({ action: 'leaderboard', password: pw });
-      if (res.success || res.error !== 'UNAUTHORIZED') {
+      const res = await callLeaderboard(pw);
+      if (res.success) {
         adminPassword = pw;
         sessionStorage.setItem('pw_admin_pass', pw);
         closePwModal();
         startAdminPolling();
         log('Admin authenticated.', 'success');
       } else {
+        const errEl = document.getElementById('pw-error');
+        if (res.error === 'INVALID_ACTION') {
+          errEl.textContent = 'Leaderboard auth endpoint missing in backend.';
+        } else {
+          errEl.textContent = 'Incorrect password. Try again.';
+        }
         document.getElementById('pw-error').style.display = 'block';
         document.getElementById('pw-btn-text').textContent = 'Unlock Panel';
         document.getElementById('pw-spinner').classList.add('hidden');
@@ -487,6 +504,7 @@
 
     // ── Status Polling ────────────────────────────────────────
     function startAdminPolling() {
+      if (statusInterval) clearInterval(statusInterval);
       fetchAdminStatus();
       statusInterval = setInterval(fetchAdminStatus, 5000);
     }

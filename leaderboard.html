@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Prompt Wars — Leaderboard</title>
   <meta name="description" content="Live leaderboard for Prompt Wars — see who's winning in real time!" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
   <style>
     /* ── Full page leaderboard ── */
     body { background: #060616; }
@@ -229,8 +229,18 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="utils.js"></script>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <p class="site-footer-copy">Prompt Wars Projector View</p>
+      <div class="site-footer-links">
+        <a href="index.html">Home</a>
+        <a href="participant.html">Participant</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/utils.js"></script>
   <script>
     let lbPassword = '';
     let refreshInterval = null;
@@ -249,7 +259,7 @@
       document.getElementById('lb-pw-btn').disabled = true;
       document.getElementById('lb-pw-error').style.display = 'none';
 
-      const res = await callAPIGet({ action: 'leaderboard', password: pw });
+      const res = await callLeaderboard(pw);
       if (res.success) {
         lbPassword = pw;
         sessionStorage.setItem('pw_lb_pass', pw);
@@ -257,6 +267,14 @@
         renderLeaderboard(res);
         startAutoRefresh();
       } else {
+        const errEl = document.getElementById('lb-pw-error');
+        if (res.error === 'UNAUTHORIZED') {
+          errEl.textContent = 'Incorrect password.';
+        } else if (res.error === 'INVALID_ACTION') {
+          errEl.textContent = 'Leaderboard endpoint is not enabled in backend (INVALID_ACTION).';
+        } else {
+          errEl.textContent = 'Could not reach leaderboard. Please try again.';
+        }
         document.getElementById('lb-pw-error').style.display = 'block';
         document.getElementById('lb-pw-btn-text').textContent = 'View Leaderboard';
         document.getElementById('lb-pw-spinner').classList.add('hidden');
@@ -285,13 +303,14 @@
 
     // ── Auto Refresh ──────────────────────────────────────────
     function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
       fetchLeaderboard();
       refreshInterval = setInterval(fetchLeaderboard, 10000);
     }
 
     async function fetchLeaderboard() {
       const [lbRes, statusRes] = await Promise.all([
-        callAPIGet({ action: 'leaderboard', password: lbPassword }),
+        callLeaderboard(lbPassword),
         callAPIGet({ action: 'status' })
       ]);
 
@@ -306,6 +325,9 @@
         if (lbRes.error === 'UNAUTHORIZED') {
           sessionStorage.removeItem('pw_lb_pass');
           window.location.reload();
+        }
+        if (lbRes.error !== 'UNAUTHORIZED') {
+          showToast(getErrorMessage(lbRes.error), 'warning');
         }
         return;
       }
@@ -410,7 +432,7 @@
     // Page visibility
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        clearInterval(refreshInterval);
+        if (refreshInterval) clearInterval(refreshInterval);
       } else if (lbPassword) {
         fetchLeaderboard();
         startAutoRefresh();

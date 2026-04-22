@@ -21,7 +21,12 @@ var ERROR_MESSAGES = {
   "SHEETS_READ_FAILED":   "Connection error. Please refresh the page.",
   "INVALID_STATUS":       "Invalid status value.",
   "INVALID_POLL_MODE":    "Invalid poll mode value.",
-  "INVALID_MODE":         "Invalid reveal mode."
+  "INVALID_MODE":         "Invalid reveal mode.",
+  "INVALID_ACTION":       "This action is not available on the server.",
+  "INVALID_JSON":         "Bad request format sent to server.",
+  "INVALID_ROUND_TYPE":   "This action is not allowed for the current round type.",
+  "INVALID_VOTE":         "Invalid vote option. Please choose A or B.",
+  "NOT_SECRET_MODE":      "Reveal is only available in secret poll mode."
 };
 
 // ── API Call ─────────────────────────────────────────────────
@@ -51,6 +56,16 @@ async function callAPIGet(params) {
   }
 }
 
+async function callLeaderboard(password) {
+  // Primary contract: GET leaderboard.
+  var res = await callAPIGet({ action: "leaderboard", password: password });
+  // Compatibility fallback for deployments that route leaderboard via POST.
+  if (!res.success && res.error === "INVALID_ACTION") {
+    res = await callAPI({ action: "leaderboard", password: password });
+  }
+  return res;
+}
+
 async function parseJsonResponse(res) {
   const text = await res.text();
   try {
@@ -63,14 +78,14 @@ async function parseJsonResponse(res) {
 // ── Auth Helpers ─────────────────────────────────────────────
 function getAuth() {
   return {
-    teamId:    localStorage.getItem("pw_teamId"),
+    teamId: localStorage.getItem("pw_teamId"),
     authToken: localStorage.getItem("pw_authToken")
   };
 }
 
 function isRegistered() {
   return !!localStorage.getItem("pw_teamId") &&
-         !!localStorage.getItem("pw_authToken");
+    !!localStorage.getItem("pw_authToken");
 }
 
 function getTeamName() {
@@ -104,17 +119,17 @@ function setVoteForRound(round, vote) {
 // ── Image Compression ────────────────────────────────────────
 function compressImage(file, callback) {
   var reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = function (e) {
     var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
+    img.onload = function () {
+      var canvas = document.createElement("canvas");
       var max = 800;
       var w = img.width, h = img.height;
-      if (w > h && w > max)      { h = h * max / w; w = max; }
-      else if (h > max)          { w = w * max / h; h = max; }
+      if (w > h && w > max) { h = h * max / w; w = max; }
+      else if (h > max) { w = w * max / h; h = max; }
       canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL("image/jpeg", 0.7).split(",")[1]);
     };
     img.src = e.target.result;
   };
@@ -125,9 +140,9 @@ function compressImage(file, callback) {
 function showToast(message, type = "info", duration = 3500) {
   const container = document.getElementById("toast-container") || createToastContainer();
   const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
+  toast.className = "toast toast-" + type;
   const icons = { success: "✓", error: "✕", info: "ℹ", warning: "⚠" };
-  toast.innerHTML = `<span class="toast-icon">${icons[type] || "ℹ"}</span><span class="toast-msg">${message}</span>`;
+  toast.innerHTML = "<span class=\"toast-icon\">" + (icons[type] || "ℹ") + "</span><span class=\"toast-msg\">" + message + "</span>";
   container.appendChild(toast);
   setTimeout(() => toast.classList.add("show"), 10);
   setTimeout(() => {

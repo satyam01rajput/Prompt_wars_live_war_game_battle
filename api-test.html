@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Prompt Wars — API Tester</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="assets/css/style.css"/>
   <style>
     body { padding-bottom: 60px; }
 
@@ -222,9 +222,9 @@
 
       <!-- Tabs -->
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="showTab('get')">📥 GET Endpoints</button>
-        <button class="tab-btn" onclick="showTab('participant')">👤 Participant</button>
-        <button class="tab-btn" onclick="showTab('admin')">🔐 Admin</button>
+        <button class="tab-btn active" onclick="showTab('get', this)">📥 GET Endpoints</button>
+        <button class="tab-btn" onclick="showTab('participant', this)">👤 Participant</button>
+        <button class="tab-btn" onclick="showTab('admin', this)">🔐 Admin</button>
       </div>
 
       <!-- ═══════════════ GET ENDPOINTS ═══════════════ -->
@@ -544,8 +544,18 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="utils.js"></script>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <p class="site-footer-copy">Prompt Wars API QA Console</p>
+      <div class="site-footer-links">
+        <a href="index.html">Home</a>
+        <a href="admin.html">Admin</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/utils.js"></script>
   <script>
     // ── Override API_URL with tester bar ─────────────────────
     let TEST_API_URL = API_URL;
@@ -574,15 +584,15 @@
     }
 
     // ── Tab handling ──────────────────────────────────────────
-    function showTab(name) {
+    function showTab(name, btnEl) {
       ['get','participant','admin'].forEach(t => {
         document.getElementById('tab-' + t).classList.add('hidden');
       });
       document.getElementById('tab-' + name).classList.remove('hidden');
-      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      document.querySelectorAll('.tab-btn').forEach(b => {
         b.classList.remove('active');
       });
-      event.target.classList.add('active');
+      if (btnEl) btnEl.classList.add('active');
     }
 
     // ── Card toggle ───────────────────────────────────────────
@@ -594,8 +604,8 @@
     async function testGet(params) {
       const url = TEST_API_URL + '?' + new URLSearchParams(params).toString();
       const t = Date.now();
-      const res = await fetch(url);
-      const data = await res.json();
+      const res = await fetch(url, { redirect: 'follow', mode: 'cors' });
+      const data = await parseResponseJson(res);
       return { data, ms: Date.now() - t };
     }
 
@@ -603,11 +613,23 @@
       const t = Date.now();
       const res = await fetch(TEST_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        // Send a simple request so Apps Script avoids CORS preflight failures.
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(body),
+        redirect: 'follow',
+        mode: 'cors'
       });
-      const data = await res.json();
+      const data = await parseResponseJson(res);
       return { data, ms: Date.now() - t };
+    }
+
+    async function parseResponseJson(res) {
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return { success: false, error: 'SHEETS_READ_FAILED', detail: 'NON_JSON_RESPONSE' };
+      }
     }
 
     function showResponse(boxId, data, ms) {
@@ -690,7 +712,14 @@
       const btn = event.target; setLoading(btn);
       const password = document.getElementById('lb-pw').value;
       try {
-        const { data, ms } = await testGet({ action: 'leaderboard', password });
+        const first = await testGet({ action: 'leaderboard', password });
+        let data = first.data;
+        let ms = first.ms;
+        if (!data.success && data.error === 'INVALID_ACTION') {
+          const second = await testPost({ action: 'leaderboard', password });
+          data = second.data;
+          ms += second.ms;
+        }
         showResponse('res-leaderboard', data, ms);
       } catch(e) {
         showResponse('res-leaderboard', { success: false, error: 'NETWORK_ERROR' }, 0);

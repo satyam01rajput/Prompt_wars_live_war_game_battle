@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Prompt Wars — Round View</title>
   <meta name="description" content="Participate in Prompt Wars — submit your AI images and vote in live polls!" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
   <style>
     .header-team { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
     .header-round-badge {
@@ -399,8 +399,18 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="utils.js"></script>
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <p class="site-footer-copy">Prompt Wars Live Event</p>
+      <div class="site-footer-links">
+        <a href="index.html">Register</a>
+        <a href="leaderboard.html">Leaderboard</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/utils.js"></script>
   <script>
     // ── State ─────────────────────────────────────────────────
     let currentRound = null, currentType = null, currentStatus = null;
@@ -418,6 +428,7 @@
 
     // ── Status Polling ────────────────────────────────────────
     function startStatusPolling() {
+      if (pollInterval) clearInterval(pollInterval);
       fetchStatus();
       pollInterval = setInterval(fetchStatus, 5000);
     }
@@ -736,7 +747,7 @@
     // ── Page Visibility ───────────────────────────────────────
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        clearInterval(pollInterval);
+        if (pollInterval) clearInterval(pollInterval);
         stopPollResults();
       } else {
         fetchStatus();

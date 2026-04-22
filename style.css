@@ -50,7 +50,10 @@ html { scroll-behavior: smooth; font-size: 16px; }
 
 body {
   font-family: var(--font);
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 15% -10%, rgba(108,99,255,0.18), transparent 40%),
+    radial-gradient(circle at 90% 10%, rgba(0,212,255,0.14), transparent 36%),
+    var(--bg);
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
@@ -179,7 +182,7 @@ body {
 
 .glass-card:hover {
   border-color: rgba(108,99,255,0.3);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(108,99,255,0.15);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35), 0 0 0 1px rgba(108,99,255,0.15);
 }
 
 .glass-card-sm { padding: 20px; border-radius: var(--radius); }
@@ -632,6 +635,46 @@ select.form-input {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+}
+
+/* ── Site Footer ───────────────────────────────────────────── */
+.site-footer {
+  position: relative;
+  z-index: 1;
+  margin-top: 28px;
+  border-top: 1px solid var(--border);
+  background: rgba(8,8,24,0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.site-footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.site-footer-copy {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+.site-footer-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.site-footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  transition: color var(--transition-fast);
+}
+.site-footer-links a:hover {
+  color: var(--accent);
 }
 
 /* ── Upload Zone ─────────────────────────────────────────────── */
