@@ -6,6 +6,9 @@ var SHEET_VOTES = "Poll Votes";
 var SHEET_SCORES = "Scores";
 var SHEET_LEADERBOARD = "Leaderboard";
 
+// Commit / Risk round config
+var COMMIT_BASE_POINTS = 20;
+
 // Run these test function whenever adding the appsScript to a new account
 
 function testDriveAccess() {
@@ -96,6 +99,97 @@ function processPollResults(round, overrideMode, forceReprocess) {
       "poll",
       points,
       vote
+    ]);
+    saved++;
+  }
+
+  updateLeaderboard();
+  return saved;
+}
+
+function processCommitResults(round, overrideMode, forceReprocess) {
+  var votesSheet = getSheet(SHEET_VOTES);
+  var scoresSheet = getSheet(SHEET_SCORES);
+  var control = getControl();
+  var existing = scoresSheet.getDataRange().getValues();
+
+  if (!forceReprocess) {
+    for (var i = 1; i < existing.length; i++) {
+      if (existing[i][1] == round && existing[i][2] === "commit") {
+        return 0; // already processed
+      }
+    }
+  }
+
+  var data = votesSheet.getDataRange().getValues();
+  var finalVotes = {};
+
+  // Step 1: Get last vote per team
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][2] != round) continue;
+    var teamId = data[i][1];
+    finalVotes[teamId] = data[i][3]; // overwrite → last wins
+  }
+
+  var countA = 0;
+  var countB = 0;
+
+  // Step 2: Count A/B votes (ignore NO_COMMIT)
+  for (var teamId in finalVotes) {
+    var val = finalVotes[teamId];
+    if (!val) continue;
+    if (val === "NO_COMMIT") continue;
+
+    // Accept either "A|sure" or "A" (defensive)
+    var vote = String(val).split("|")[0];
+    if (vote === "A") countA++;
+    if (vote === "B") countB++;
+  }
+
+  // Step 3: Determine winner
+  var winning;
+  var mode = overrideMode || (control.pollMode === "secret"
+    ? control.pollReveal
+    : control.pollMode);
+
+  if (countA === countB) {
+    winning = "tie";
+  } else if (mode === "majority") {
+    winning = countA > countB ? "A" : "B";
+  } else if (mode === "minority") {
+    winning = countA < countB ? "A" : "B";
+  } else {
+    // Fallback to majority if mode not set (e.g. secret before reveal)
+    winning = countA > countB ? "A" : "B";
+  }
+
+  // Step 4: Assign points
+  var saved = 0;
+  for (var teamId in finalVotes) {
+    var val = finalVotes[teamId];
+    var points = 0;
+
+    if (!val || val === "NO_COMMIT" || winning === "tie") {
+      points = 0;
+    } else {
+      var parts = String(val).split("|");
+      var vote = parts[0];
+      var confidence = parts[1] || "not_sure";
+      var multiplier = (confidence === "sure") ? 2 : 1;
+
+      if (vote === winning) {
+        points = COMMIT_BASE_POINTS * multiplier;
+      } else {
+        points = -COMMIT_BASE_POINTS * multiplier;
+      }
+    }
+
+    scoresSheet.appendRow([
+      teamId,
+      round,
+      "commit",
+      points,
+      val
     ]);
     saved++;
   }
@@ -455,16 +549,18 @@ function doGet(e) {
       });
     }
 
-    if (info.roundType === "poll") {
+    if (info.roundType === "poll" || info.roundType === "commit") {
       return jsonResponse({
         success: true,
         roundNumber: info.roundNumber,
-        roundType: "poll",
+        roundType: info.roundType,
         pollQuestion: info.pollQuestion,
         optionA: info.optionA,
         optionB: info.optionB
       });
     }
+
+    return jsonResponse({ success: false, error: "INVALID_ROUND_TYPE" });
   }
 
   if (action === "leaderboard") {
@@ -517,8 +613,12 @@ function doGet(e) {
     }
 
     for (var teamId in lastVoteByTeam) {
-      if (lastVoteByTeam[teamId] === "A") countA++;
-      if (lastVoteByTeam[teamId] === "B") countB++;
+      var raw = lastVoteByTeam[teamId];
+      if (!raw) continue;
+      if (raw === "NO_COMMIT") continue;
+      var vote = String(raw).split("|")[0];
+      if (vote === "A") countA++;
+      if (vote === "B") countB++;
     }
 
     return jsonResponse({
@@ -720,6 +820,7 @@ function doPost(e) {
       var token  = body.authToken;
       var round  = body.round;
       var vote   = body.vote;
+      var confidence = body.confidence;
       var ts     = body.timestamp;
 
       // Auth check
@@ -729,7 +830,7 @@ function doPost(e) {
 
       var control = getControl();
 
-      if (control.roundType !== "poll") {
+      if (control.roundType !== "poll" && control.roundType !== "commit") {
         return jsonResponse({ success: false, error: "INVALID_ROUND_TYPE" });
       }
 
@@ -744,8 +845,23 @@ function doPost(e) {
       }
 
       // Validate vote
-      if (vote !== "A" && vote !== "B") {
-        return jsonResponse({ success: false, error: "INVALID_VOTE" });
+      var storedValue = null;
+      if (control.roundType === "poll") {
+        if (vote !== "A" && vote !== "B") {
+          return jsonResponse({ success: false, error: "INVALID_VOTE" });
+        }
+        storedValue = vote;
+      } else if (control.roundType === "commit") {
+        if (vote === "NO_COMMIT") {
+          storedValue = "NO_COMMIT";
+        } else if (vote === "A" || vote === "B") {
+          if (confidence !== "sure" && confidence !== "not_sure") {
+            return jsonResponse({ success: false, error: "INVALID_CONFIDENCE" });
+          }
+          storedValue = vote + "|" + confidence;
+        } else {
+          return jsonResponse({ success: false, error: "INVALID_VOTE" });
+        }
       }
 
       var lock = LockService.getScriptLock();
@@ -776,14 +892,14 @@ function doPost(e) {
           voteId,
           teamId,
           round,
-          vote,
+          storedValue,
           ts,
           "FALSE"
         ]);
 
         return jsonResponse({
           success: true,
-          recorded: vote
+          recorded: storedValue
         });
 
       } finally {
@@ -816,7 +932,7 @@ function doPost(e) {
       }
 
       if (roundType !== undefined) {
-        if (roundType !== "image" && roundType !== "poll") {
+        if (roundType !== "image" && roundType !== "poll" && roundType !== "commit") {
           return jsonResponse({ success: false, error: "INVALID_ROUND_TYPE" });
         }
 
@@ -839,8 +955,12 @@ function doPost(e) {
 
       var control = getControl();
 
-      if (status === "closed" && control.roundType === "poll" && control.pollMode !== "secret") {
-        processPollResults(control.roundNumber);
+      if (status === "closed") {
+        if (control.roundType === "poll" && control.pollMode !== "secret") {
+          processPollResults(control.roundNumber);
+        } else if (control.roundType === "commit" && control.pollMode !== "secret") {
+          processCommitResults(control.roundNumber, null, false);
+        }
       }
 
       return jsonResponse({
@@ -886,7 +1006,14 @@ function doPost(e) {
       sheet.getRange(2, 5).setValue(mode);
 
       // For secret rounds, score now using revealed mode.
-      var saved = processPollResults(control.roundNumber, mode, false);
+      var saved = 0;
+      if (control.roundType === "poll") {
+        saved = processPollResults(control.roundNumber, mode, false);
+      } else if (control.roundType === "commit") {
+        saved = processCommitResults(control.roundNumber, mode, false);
+      } else {
+        return jsonResponse({ success: false, error: "INVALID_ROUND_TYPE" });
+      }
 
       return jsonResponse({
         success: true,

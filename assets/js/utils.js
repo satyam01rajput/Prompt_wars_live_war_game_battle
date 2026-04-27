@@ -25,7 +25,8 @@ var ERROR_MESSAGES = {
   "INVALID_ACTION":       "This action is not available on the server.",
   "INVALID_JSON":         "Bad request format sent to server.",
   "INVALID_ROUND_TYPE":   "This action is not allowed for the current round type.",
-  "INVALID_VOTE":         "Invalid vote option. Please choose A or B.",
+  "INVALID_VOTE":         "Invalid vote option.",
+  "INVALID_CONFIDENCE":   "Please choose sure / not sure.",
   "NOT_SECRET_MODE":      "Reveal is only available in secret poll mode."
 };
 

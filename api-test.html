@@ -413,7 +413,7 @@
             <span class="toggle-arrow">▶</span>
           </div>
           <div class="endpoint-body">
-            <p class="text-muted text-sm mb-3">5-second cooldown between switches. Vote must be "A" or "B".</p>
+            <p class="text-muted text-sm mb-3">5-second cooldown between switches. For commit rounds you can also send NO_COMMIT + confidence.</p>
             <div class="fields-grid">
               <div class="field-group">
                 <label>Round *</label>
@@ -424,6 +424,15 @@
                 <select id="sv-vote">
                   <option value="A">A</option>
                   <option value="B">B</option>
+                  <option value="NO_COMMIT">NO_COMMIT</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Confidence (commit only)</label>
+                <select id="sv-confidence">
+                  <option value="">(none)</option>
+                  <option value="sure">sure</option>
+                  <option value="not_sure">not_sure</option>
                 </select>
               </div>
             </div>
@@ -773,11 +782,14 @@
       const teamId    = document.getElementById('auth-team-id').value.trim();
       const authToken = document.getElementById('auth-token').value.trim();
       if (!teamId || !authToken) { resetBtn(btn, '▶ Run'); showToast('Fill teamId + authToken above.','error'); return; }
+      const vote = document.getElementById('sv-vote').value;
+      const confidence = document.getElementById('sv-confidence').value || undefined;
       const body = {
         action: 'submitVote',
         teamId, authToken,
         round:     parseInt(document.getElementById('sv-round').value),
-        vote:      document.getElementById('sv-vote').value,
+        vote:      vote,
+        confidence: confidence,
         timestamp: Date.now()
       };
       try {
